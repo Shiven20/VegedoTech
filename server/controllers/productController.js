@@ -1,5 +1,6 @@
 import Product from "../models/Product.js";
 import cloudinary from "cloudinary";
+import { invalidateModel } from "../ml/modelStore.js";
 
 // ADD PRODUCT
 export const addProduct = async (req, res) => {
@@ -27,6 +28,7 @@ export const addProduct = async (req, res) => {
     });
 
     await newProduct.save();
+    invalidateModel(); // catalogue changed, refit recommendations on next request
     res
       .status(201)
       .json({ success: true, message: "Product added", product: newProduct });
@@ -76,6 +78,7 @@ export const changeStock = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Product not found" });
 
+    invalidateModel(); // stock flag feeds the recommender's filtering
     res
       .status(200)
       .json({ success: true, message: "Stock status updated", product });

@@ -7,7 +7,7 @@ import { useAppContext } from "../../context/AppContext";
 
 
 const AddProduct = () => {
-    const { axios, navigate } = useAppContext();
+    const { axios } = useAppContext();
 
     const [files,setFiles] =useState([])
     const [name,setName] =useState('')

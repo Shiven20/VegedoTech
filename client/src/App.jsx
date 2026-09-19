@@ -17,6 +17,7 @@ import SellerLayout from './pages/seller/SellerLayout'
 import AddProduct from './pages/seller/AddProduct'
 import ProductList from './pages/seller/ProductList'
 import Orders from './pages/seller/Orders'
+import DemandForecast from './pages/seller/DemandForecast'
 import Contact from './pages/Contact'
 import About from './pages/About'
 import Loading from './components/Loading'
@@ -56,6 +57,7 @@ const App = () => {
             <Route index element={isSeller ? <AddProduct /> : null} />
             <Route path="product-list" element={<ProductList />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="forecast" element={<DemandForecast />} />
           </Route>
         </Routes>
       </div>

@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to save runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20.x"
+
+jobs:
+  server:
+    name: Server (lint + ML tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Syntax check
+        working-directory: server
+        run: node --experimental-vm-modules scripts/lint.js
+
+      - name: Run ML + API test suite
+        working-directory: server
+        run: npm run test:ci
+        env:
+          JWT_SECRET: ci-test-secret
+          SELLER_EMAIL: seller@ci.test
+          NODE_ENV: test
+
+      - name: Boot smoke test
+        working-directory: server
+        run: node scripts/smoke.js
+        env:
+          JWT_SECRET: ci-test-secret
+          SELLER_EMAIL: seller@ci.test
+          NODE_ENV: test
+
+  client:
+    name: Client (lint + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+
+      - name: Build
+        working-directory: client
+        run: npm run build
+        env:
+          VITE_CURRENCY: "₹"
+          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL || 'http://localhost:4000' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-dist
+          path: client/dist
+          retention-days: 7
+
+  ml-quality-gate:
+    name: ML quality gate
+    runs-on: ubuntu-latest
+    needs: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      # Blocks the merge if recommendation precision@5 or forecast error
+      # regress past the thresholds baked into the script.
+      - name: Evaluate model quality
+        working-directory: server
+        run: node scripts/evaluate-model.js
+
+      - name: Upload metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-metrics
+          path: server/ml-metrics.json
+          retention-days: 30

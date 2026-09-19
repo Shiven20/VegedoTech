@@ -5,6 +5,7 @@ import { useParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { assets } from "../assets/assets";
 import ProductCard from "../components/ProductCard";
+import RecommendedProducts from "../components/RecommendedProducts";
 
 const ProductDetails = () => {
 
@@ -16,12 +17,17 @@ const ProductDetails = () => {
     const product=products.find((item)=>item._id === id)
 
     useEffect(()=>{
-      if(products.length>0){
-        let productsCopy =products.slice()
-        productsCopy=productsCopy.filter((item)=> product.category === item.category)
+      if(products.length>0 && product){
+        const productsCopy = products.filter(
+          (item)=> item.category === product.category
+                && item._id !== product._id   // don't list a product as related to itself
+                && item.inStock
+        )
         setRelatedProducts(productsCopy.slice(0,5))
+      } else {
+        setRelatedProducts([])
       }
-    },[products])
+    },[products,id])
 
     useEffect(()=>{
       setThumbnail(product?.image[0] ? product.image[0]: null)
@@ -93,13 +99,22 @@ const ProductDetails = () => {
               <div className="w-20 h-0.5 bg-primary rounded-full mt-2"></div>
               </div>
               <div className=" grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 lg:grid-cols-5 mt-6 w-full">
-                {relatedProducts.filter(()=>product.inStock).map((product,index)=>(
-                  <ProductCard key={index} product={product}/>
+                {/* Filtering already happened when relatedProducts was built. */}
+                {relatedProducts.map((relatedProduct)=>(
+                  <ProductCard key={relatedProduct._id} product={relatedProduct}/>
                 ))}
               </div>
               <button onClick={()=>{navigate('/products');scrollTo(0,0)}} className="mx-auto cursor-pointer px-12 my-16 py-2.5 border rounded text-primary hover:bg-primary/10 transition">See more</button>
             </div>
-            <div></div>
+
+            {/* AI: content + collaborative "more like this" */}
+            <RecommendedProducts
+              productId={product._id}
+              title="Customers also liked"
+              subtitle="Ranked by product similarity and real co-purchase patterns"
+              limit={5}
+            />
+            <div className="pb-16"></div>
         </div>
     );
 };

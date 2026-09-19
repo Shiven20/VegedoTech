@@ -1,6 +1,5 @@
-import { createContext, use, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { dummyProducts } from "../assets/assets";
 import toast from "react-hot-toast";
 import axios from "axios";
 
@@ -20,7 +19,69 @@ export const AppContextProvider = ({children})=>{
     const [products,setProducts] =useState([])
 
     const [cartItems,setCartItems] = useState({})
-    const [searchQuery, setSearchQuery] = useState({})
+    const [searchQuery, setSearchQuery] = useState("")
+
+    // ---- AI layer ----
+    const [aiSearchResults, setAiSearchResults] = useState([])
+    const [aiSearchLoading, setAiSearchLoading] = useState(false)
+    const [recommendations, setRecommendations] = useState([])
+    const [recommendationSource, setRecommendationSource] = useState(null)
+
+    /** Ranked catalogue search powered by /api/ai/search (TF-IDF + typo tolerance). */
+    const runSmartSearch = async (query) => {
+      const trimmed = (query ?? "").trim();
+      if (!trimmed) {
+        setAiSearchResults([]);
+        return [];
+      }
+      setAiSearchLoading(true);
+      try {
+        const { data } = await axios.get("/api/ai/search", {
+          params: { q: trimmed, limit: 20 },
+        });
+        const results = data?.success ? data.results : [];
+        setAiSearchResults(results);
+        return results;
+      } catch (error) {
+        console.error("AI search failed:", error.message);
+        setAiSearchResults([]);
+        return [];
+      } finally {
+        setAiSearchLoading(false);
+      }
+    };
+
+    /** Personalised feed. Seeds default to the current cart on the server. */
+    const fetchRecommendations = async (productIds = [], limit = 8) => {
+      try {
+        const { data } = await axios.post("/api/ai/recommendations", {
+          productIds,
+          limit,
+        });
+        if (data?.success) {
+          setRecommendations(data.recommendations);
+          setRecommendationSource(data.source);
+          return data.recommendations;
+        }
+      } catch (error) {
+        console.error("AI recommendations failed:", error.message);
+      }
+      return [];
+    };
+
+    /** "More like this" for a single product page. */
+    const fetchSimilarProducts = async (productId, limit = 5) => {
+      if (!productId) return [];
+      try {
+        const { data } = await axios.get(`/api/ai/similar/${productId}`, {
+          params: { limit },
+        });
+        return data?.success ? data.recommendations : [];
+      } catch (error) {
+        console.error("AI similar products failed:", error.message);
+        return [];
+      }
+    };
 
     const fetchSeller = async () => {
       try {
@@ -33,7 +94,7 @@ export const AppContextProvider = ({children})=>{
             //console.log("here");
           setIsSeller(null);
         }
-      } catch (error) {
+      } catch {
         setIsSeller(null);
       }
     };
@@ -47,7 +108,7 @@ export const AppContextProvider = ({children})=>{
         } else {
           setUser(false);
         }
-      } catch (error) {
+      } catch {
         setUser(false);
       }
     };
@@ -133,6 +194,17 @@ export const AppContextProvider = ({children})=>{
         fetchproducts()
     },[])
 
+    // Debounced AI search so typing doesn't fire a request per keystroke.
+    useEffect(() => {
+      const trimmed = (searchQuery ?? "").trim();
+      if (!trimmed) {
+        setAiSearchResults([]);
+        return;
+      }
+      const timer = setTimeout(() => runSmartSearch(trimmed), 350);
+      return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     useEffect(() => {
         
         
@@ -174,7 +246,15 @@ export const AppContextProvider = ({children})=>{
       getCartCount,
       axios,
       fetchproducts,
-      setCartItems
+      setCartItems,
+      // AI layer
+      runSmartSearch,
+      aiSearchResults,
+      aiSearchLoading,
+      fetchRecommendations,
+      fetchSimilarProducts,
+      recommendations,
+      recommendationSource,
     };
 
     return <AppContext.Provider value={value}>

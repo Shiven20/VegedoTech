@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { useAppContext } from "../context/AppContext"
-import { assets, dummyAddress } from "../assets/assets"
+import { assets } from "../assets/assets"
 import toast from "react-hot-toast"
+import RecommendedProducts from "../components/RecommendedProducts"
 
 const Cart = () => {
    
@@ -112,6 +113,7 @@ const Cart = () => {
     },[user])
 
     return products.length >0 && cartItems ? (
+      <>
         <div className="flex flex-col pt-40 md:flex-row mt-16">
             <div className='flex-1 max-w-4xl'>
                 <h1 className="text-3xl font-medium mb-6">
@@ -174,7 +176,7 @@ const Cart = () => {
                         </button>
                         {showAddress && (
                             <div className="absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full">
-                               {addresses.map((address,index)=>(<p onClick={() => { setSelectedAddress(address); setShowAddress(false)}} className="text-gray-500 p-2 hover:bg-gray-100">
+                               {addresses.map((address)=>(<p key={address._id} onClick={() => { setSelectedAddress(address); setShowAddress(false)}} className="text-gray-500 p-2 hover:bg-gray-100">
                                     {address.street},{address.city},{address.state},{address.country}
                                 </p>))} 
                                 <p onClick={() => navigate("/add-address")} className="text-primary text-center cursor-pointer p-2 hover:bg-primary/10">
@@ -214,6 +216,16 @@ const Cart = () => {
                 </button>
             </div>
         </div>
+
+        {/* AI: basket-aware add-ons driven by co-purchase history */}
+        <RecommendedProducts
+          seedIds={cartArray.map((item) => item._id)}
+          title="Complete your basket"
+          subtitle="Frequently bought with the items in your cart"
+          limit={5}
+        />
+        <div className="pb-16" />
+      </>
     ) : null
 }
 export default Cart
