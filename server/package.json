@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "server": "nodemon --env-file=.env server.js"
+    "server": "nodemon --env-file=.env server.js",
+    "test": "node --test ml/__tests__/",
+    "test:ci": "node --test --test-reporter=spec ml/__tests__/",
+    "lint": "node --check server.js && node scripts/lint.js"
   },
   "keywords": [],
   "author": "",

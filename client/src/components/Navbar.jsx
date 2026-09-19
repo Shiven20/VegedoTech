@@ -21,21 +21,20 @@ const Navbar = () => {
     }, []);
 
     const logout = async () => {
-        const {data} = await axios.get('/api/user/logout');
+        try {
+            // Request stays inside the try so a network failure is handled too.
+            const { data } = await axios.get('/api/user/logout');
 
-       try{ if(data.success){
-            toast.success(data.message)
-             setUser(null);
-            navigate("/");
+            if (data.success) {
+                toast.success(data.message);
+                setUser(null);
+                navigate("/");
+            } else {
+                toast.error(data.message || "Logout failed");
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || error.message);
         }
-        else{
-            toast.error("error")
-        }
-        }catch(error){
-            toast.error("error");
-        }
-       
-        
     };
 
     useEffect(()=>{
