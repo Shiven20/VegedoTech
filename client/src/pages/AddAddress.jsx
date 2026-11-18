@@ -33,6 +33,22 @@ const AddAddress = () => {
     phone:'',
   })
 
+  // Show loading while user state is being determined
+  if (user === null) {
+    return (
+      <div className="mt-16 pb-16 pt-20 flex items-center justify-center min-h-[400px]">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  // Redirect if not logged in
+  if (user === false) {
+    toast.error("Please login to add an address");
+    navigate('/cart');
+    return null;
+  }
+
   const handleChange=(e)=>{
     const {name,value}=e.target;
 
@@ -59,11 +75,7 @@ const AddAddress = () => {
       toast.error(error.message);
     }
   }
-  useEffect(()=>{
-    if(!user){
-      navigate('/cart')
-    }
-  },[])
+  
   return (
     <div className='mt-16 pb-16 pt-20'> 
       <p className='text-2xl md:text-3xl text-gray-500'>Add Shipping <span className='font-semibold text-primary'>Address</span></p>

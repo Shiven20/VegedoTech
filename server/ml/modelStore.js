@@ -21,14 +21,30 @@ const ORDER_LOOKBACK_DAYS = Number(process.env.ML_ORDER_LOOKBACK_DAYS ?? 90);
 export async function loadTrainingData() {
   const since = new Date(Date.now() - ORDER_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
-  const [products, orders] = await Promise.all([
-    Product.find().lean(),
-    Order.find({ createdAt: { $gte: since } })
-      .select("items amount createdAt")
-      .lean(),
-  ]);
+  try {
+    const [products, orders] = await Promise.all([
+      Product.find().select('-__v').lean().exec(),
+      Order.find({ createdAt: { $gte: since } })
+        .select("items createdAt -_id")
+        .lean()
+        .exec(),
+    ]);
 
-  return { products, orders };
+    // Ensure orders don't have circular references
+    const cleanOrders = orders.map(order => ({
+      items: (order.items || []).map(item => ({
+        product: typeof item.product === 'object' ? String(item.product._id || item.product) : String(item.product),
+        quantity: Number(item.quantity) || 1
+      })),
+      createdAt: order.createdAt
+    }));
+
+    return { products, orders: cleanOrders };
+  } catch (error) {
+    console.error('loadTrainingData error:', error.message);
+    // Return empty data on error so the app doesn't crash
+    return { products: [], orders: [] };
+  }
 }
 
 /**
