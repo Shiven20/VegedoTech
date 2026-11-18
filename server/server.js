@@ -1,7 +1,12 @@
+import 'dotenv/config';
+import dns from 'dns';
 import cookieParser from "cookie-parser";
 import express from "express";
 import cors from 'cors';
 import connectDB from "./configs/db.js";
+
+// Set DNS servers to Google's public DNS to resolve MongoDB Atlas hostnames
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 import userRouter from "./routes/userRoute.js";
 import sellerRouter from "./routes/sellerRoute.js";
 import productRouter from "./routes/productRoute.js";

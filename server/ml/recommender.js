@@ -268,7 +268,26 @@ export function idOf(value) {
   if (!value) return null;
   if (typeof value === "string") return value;
   if (typeof value === "object") {
-    if (value._id) return idOf(value._id);
+    // Handle Mongoose ObjectId directly
+    if (value.constructor && value.constructor.name === "ObjectId") {
+      return value.toString();
+    }
+    // Handle objects with _id property (but prevent infinite recursion)
+    if (value._id) {
+      const id = value._id;
+      // If _id is a string, return it directly
+      if (typeof id === "string") return id;
+      // If _id is an ObjectId, convert to string
+      if (id.constructor && id.constructor.name === "ObjectId") {
+        return id.toString();
+      }
+      // If _id has a toString method, use it
+      if (typeof id.toString === "function") {
+        const str = id.toString();
+        return str === "[object Object]" ? null : str;
+      }
+    }
+    // Last resort: try toString on the value itself
     if (typeof value.toString === "function") {
       const str = value.toString();
       return str === "[object Object]" ? null : str;

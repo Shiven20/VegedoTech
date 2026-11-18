@@ -1,6 +1,6 @@
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import User from "../models/User.js";
+import User from "../models/user.js";
 import { getModel, modelMeta, invalidateModel } from "../ml/modelStore.js";
 import { forecastDemand } from "../ml/forecaster.js";
 import { idOf } from "../ml/recommender.js";
@@ -55,27 +55,42 @@ export const personalRecommendations = async (req, res) => {
     let source = explicit.length ? "selection" : "trending";
 
     if (seeds.length === 0 && userId) {
-      const user = await User.findById(userId).select("cartItems").lean();
-      const cartSeeds = Object.entries(user?.cartItems ?? {})
-        .filter(([, qty]) => Number(qty) > 0)
-        .map(([productId]) => productId);
+      try {
+        const user = await User.findById(userId).select("cartItems").lean().exec();
+        const cartSeeds = Object.entries(user?.cartItems ?? {})
+          .filter(([, qty]) => Number(qty) > 0)
+          .map(([productId]) => String(productId));
 
-      if (cartSeeds.length) {
-        seeds = cartSeeds;
-        source = "cart";
-      } else {
-        const orders = await Order.find({ userId })
-          .select("items")
-          .sort({ createdAt: -1 })
-          .limit(10)
-          .lean();
-        const historySeeds = [
-          ...new Set(orders.flatMap((o) => (o.items ?? []).map((i) => idOf(i.product)))),
-        ].filter(Boolean);
-        if (historySeeds.length) {
-          seeds = historySeeds;
-          source = "order-history";
+        if (cartSeeds.length) {
+          seeds = cartSeeds;
+          source = "cart";
+        } else {
+          const orders = await Order.find({ userId })
+            .select("items")
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean()
+            .exec();
+          
+          const historySeeds = [
+            ...new Set(
+              orders.flatMap((o) => 
+                (o.items ?? []).map((i) => {
+                  const pid = idOf(i.product);
+                  return pid ? String(pid) : null;
+                })
+              ).filter(Boolean)
+            ),
+          ];
+          
+          if (historySeeds.length) {
+            seeds = historySeeds;
+            source = "order-history";
+          }
         }
+      } catch (userError) {
+        console.error("Error fetching user data:", userError.message);
+        // Continue with empty seeds (will fall back to trending)
       }
     }
 
@@ -91,6 +106,7 @@ export const personalRecommendations = async (req, res) => {
     });
   } catch (error) {
     console.error("personalRecommendations error:", error.message);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({ success: false, message: "Failed to compute recommendations" });
   }
 };
@@ -171,18 +187,21 @@ export const retrainModel = async (_req, res) => {
 };
 
 function toDto({ product, score, contentScore, collabScore, reason }) {
+  // Safely extract product data to avoid circular references
+  const safeProduct = product && typeof product === 'object' ? product : {};
+  
   return {
     _id: idOf(product),
-    name: product?.name,
-    category: product?.category,
-    price: product?.price,
-    offerPrice: product?.offerPrice,
-    image: product?.image ?? [],
-    description: product?.description ?? [],
-    inStock: product?.inStock !== false,
-    score,
-    contentScore,
-    collabScore,
-    reason,
+    name: safeProduct?.name || "Unknown",
+    category: safeProduct?.category || "Uncategorised",
+    price: Number(safeProduct?.price) || 0,
+    offerPrice: Number(safeProduct?.offerPrice) || 0,
+    image: Array.isArray(safeProduct?.image) ? safeProduct.image : [],
+    description: Array.isArray(safeProduct?.description) ? safeProduct.description : [],
+    inStock: safeProduct?.inStock !== false,
+    score: Number(score) || 0,
+    contentScore: Number(contentScore) || 0,
+    collabScore: Number(collabScore) || 0,
+    reason: String(reason || 'suggested'),
   };
 }
